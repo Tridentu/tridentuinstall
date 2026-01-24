@@ -1,0 +1,11 @@
+#!/bin/bash
+title=xbps-command-not-found
+description="- Suggest installation of xbps packages in interactive shell sessions"
+status=off
+
+main() {
+    commandFailure="Installing xbps-command-not-found package has failed." &&
+        install xbps-command-not-found
+
+    return 0
+}
