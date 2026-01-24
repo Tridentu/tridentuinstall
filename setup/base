@@ -92,9 +92,6 @@ case "$basesystem" in
     ;;
 esac
 
-# clean up any packages in xbps cache that were removed by above
-system "xbps-remove -ROO"
-
 [ -n "$bootloader" ] && [ "$bootloader" != "none" ] &&
     commandFailure="Bootloader package installation has failed"
 
