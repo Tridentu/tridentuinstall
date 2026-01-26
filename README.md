@@ -1,5 +1,5 @@
-# void-install-script
-TUI Shell script installer for Void Linux
+# tridentuinstall
+TUI-based installer based on the Void Linux installer
 
 This installer was primarily created to serve as an installer with encryption support while also having general installation options one would want, with sane defaults.
 
@@ -7,47 +7,32 @@ The overall goal of this installer is to deploy a system that is ready to use as
 
 At the moment, this installer does not have stable releases. The most recent commit should be considered the most recent stable release. Of course, if you run into bugs, please create an issue. (Or, if you're inclined, create a pull request to fix it.)
 
-This script is not officially supported. Any issues should be filed here as opposed to any official Void Linux support area- if you're not sure if the issue you're facing stems from this installer, it would be best to create an issue on this repository before asking in the Void IRC or making a post on the subreddit.
-
 ![TUI Image](https://github.com/kkrruumm/void-install-script/blob/main/images/tuiscreenshot.png)
 
 # Features
 ```
 -Option to add user-created modules to be executed by the installer, see modules notes
 -Included modules do various things, a few included ones:
---Option to enable system logging with socklog
---Option to install wifi firmware and basic utilities
---Option to install Flatpak with Flathub repository
---Option to install and preconfigure qemu and libvirt
 --Option to install nftables with a default firewall config
 --Various security related modules
 
--Option to choose between grub, zfsbootmenu (with zfs only), and UKI to boot the system
--Option to choose between dracut and tinyramfs (without zfs) initramfs generators
+-Option to choose between grub and UKI to boot the system
 
 -Option to encrypt installation disk
 --With UKI setup, encryption will encrypt both /boot and / using luks2
 --With grub setup, encryption will encrypt both /boot and / using luks1
 
--Option to pre-install and pre-configure the following:
---Graphics drivers (amd, nvidia, intel, nvidia-nouveau, none)
---Networking (dhcpcd, NetworkManager, none)
+-Option to pre-configure the following:
 --Audio server (pipewire, pulseaudio, none)
 
---DE or WM (gnome, i3, kde, mate, niri, river, sway, swayfx, wayfire, xfce, none)
----With i3, there is an option to install lightdm
----With sway, swayfx, wayfire, river, and niri there is an option to install greetd
+--Or, chooe to do none of these and install a bare-minimum system
 
---Or, choose to do none of these and install a bare-minimum system
-
--Option to choose between xfs, ext4, zfs, and btrfs filesystems
+-Option to choose between xfs, ext4 and btrfs filesystems
 
 -Option to choose between LVM and a traditional install
 -Option to choose between zram, swap partition, and normal swapfile
 -Option to securely erase the installation disk with shred
--Option to choose between doas or sudo
 -Option to choose your repository mirror
--Option to choose between linux, linux-lts, and linux-mainline kernels
 -Configure partitions in the installer for home, swap, and root with LVM
 -Support for both glibc and musl
 -User creation and basic configuration
@@ -56,8 +41,7 @@ This script is not officially supported. Any issues should be filed here as oppo
 
 # Instructions
 
-1. Boot into a Void Linux live medium
-2. Login as `anon` with password `voidlinux`
+1. Boot into a Tridentu 2 live medium
 3. Run the following commands:
     - `sudo xbps-install -Su`
     - `sudo xbps-install -S git`
@@ -110,7 +94,7 @@ Inside of the main() function, you're free to add any commands you'd like to be 
 
 If the module script requires a certain value that may or may not be set by the user, you may check if this variable is set at the top of the module file, and return 1 if it is not. If a module returns 1, it will not be shown in the modules menu. The esync module is an example of this as it requires a username in order to function.
 
-If your module changes kernel parameters, and you make use of the setKernelParam wrapper function, the installer will automatically run ``update-grub`` or rebuild the UKI once all of the modules have run.
+If your module changes kernel parameters, and you make use of the setKernelParam wrapper function, the installer will automatically run ``build-grub`` or rebuild the UKI once all of the modules have run.
 
 That's it!
 
@@ -124,7 +108,7 @@ This feature is also how one may define a `post_install` function to run whateve
 
 Example: 
 ```
-./viss /path/to/file
+./tridentuinstall /path/to/file
 ```
 
 Such file would contain any or all of the following options, and the following examples are set to their default values:
@@ -162,7 +146,6 @@ The LUKS default is "2000", or 2 seconds. The default in this installer has been
 
 The fips140 compliant value here would be 600000 according to owasp, though this would result in a 10 minute disk unlock time.
 
-- `zfsiters` sets the specific amount of iterations for the pbkdf2 kdf used by ZFS, as ZFS does not have a built in way to calculate this based on the amount of time the user would like to wait. Raise or lower as desired, with the same implications as itertime with LUKS.
 
 - `initrdhostonly` will instruct the initramfs generator to generate a host-specific initramfs image when set to `true`.
 
@@ -176,23 +159,11 @@ Outside of options that are potentially dangerous, "random" features that do not
 
 # zfs notes
 
-ZFS support in this installer is considered highly experimental, and testing is needed. The deployed setup is likely to change over time.
-
-If you would like to use ZFS, grab the [hrmpf](https://github.com/leahneukirchen/hrmpf/releases) ISO as detailed in the Void Linux [documentation](https://docs.voidlinux.org/installation/guides/zfs.html#installation-media), which includes the necessary things to deploy ZFS by default. Alternatively, one may build a Void Linux ISO manually that includes ZFS.
-
-This installer is tested against the latest hrmpf image, and is the expected and recommended ISO to use when deploying ZFS.
-
-For the time being, the only supported boot setup with ZFS is via [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu).
-
-The only supported encryption setup is via ZFS native encryption, as zbm is currently unable to handle luks in this context by default. However, there are some [implications](https://forums.truenas.com/t/truenas-zfs-encryption-deduplication-for-home-server/13589/3) with ZFS native encryption the user should be aware of.
-
-By default, the installer will bump the default amount of pbkdf iterations to 1,000,000 from 350,000. This is a specific amount of iterations due to ZFS' lack of ability to calculate based on the amount of time the user desires to wait, as opposed to something like LUKS.
-
-The only supported swap method out of the box via this installer is zram due to ZFS [limitations](https://github.com/openzfs/zfs/issues/7734).
+ZFS is **UNSUPPORTED** due to compatibility issues regarding the GPL and the CDDL. As a result, this section is empty. Move along, nothing to see here.
 
 # btrfs notes
 
-Do note that btrfs support in this installer is still considered experimental, meaning the deployed setup is likely to change over time.
+BTRFS support on Tridentu **IS** supported. 
 
 Currently, the btrfs option will deploy a "typical" btrfs setup, with the following subvolumes:
 
@@ -218,11 +189,11 @@ There are wrapper functions for a handful of things, such as ``install`` and ``s
 
 ``system command`` will run "command" on the new install via chroot for enabling services or otherwise, rather than repetitively entering full chroot commands. This wrapper does not need to ``|| die``, as this is handled in the function that is called, however, ``commandFailure`` must be set before ``system command`` is run if the command should provide a specific output on command failure. 
 
-``install package`` will install "package" on the new install, and also does not need to ``|| die``, as this is handled in the ``install`` function, and also must have ``commandFailure`` set before the command is run if it should return a specific output on command failure.
+``installSquashModule bundleName`` will install a SquashFS bundle file into the system. This allows for all supported defaults to be installed from the given bundle files so that everything is available that needs to be.
 
 ``setKernelParam "parameter"`` will add ``parameter`` to the new installations kernel parameters, does not need to ``|| die``, and also must have ``commandFailure`` set before the command is run if it should return a specific output on command failure. 
 
-All of the current and future wrapper functions will be located in ``misc/libviss``.
+All of the current and future wrapper functions will be located in ``misc/libtridentuis``.
 
 # Misc notes
 
@@ -246,4 +217,3 @@ There *are* a few things to keep in mind-
 - Add manual partitioning
 - Split security modules into their own menu
 - Add more bootloader choices such as limine and systemd-boot
-- You tell me, or, open a PR adding what you want.

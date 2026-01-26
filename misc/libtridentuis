@@ -11,7 +11,7 @@ die() {
 }
 
 drawDialog() {
-    dialog --stdout --cancel-label "Skip" --no-mouse --backtitle "https://github.com/kkrruumm/void-install-script" "$@"
+    dialog --stdout --cancel-label "Skip" --no-mouse --backtitle "https://github.com/Tridentu/tridentinstall" "$@"
 }
 
 diskCalculator() {
@@ -53,13 +53,19 @@ checkModule() {
     fi
 }
 
-install() {
-    xbps-install -Sy -R "$repository" -r /mnt "$@" || die
+installSquashModule() {
+    unsquashfs -d /mnt -exclude-file /etc/tridentu-exclude-list.txt -f /run/initramfs/memory/data/tridentu2-linux/modules/"$1-core.sb" || die
 }
+
 
 system() {
     chroot /mnt /bin/bash -c "$@" || die
 }
+
+systemctlEnable() {
+    system "systemctl enable $1"
+}
+
 
 setKernelParam() {
     case "$bootloader" in
@@ -68,12 +74,6 @@ setKernelParam() {
         ;;
         uki)
             sed -i -e "s:loglevel=4:loglevel=4 $1:" /mnt/etc/kernel.d/post-install/60-ukify || die
-        ;;
-        zfsbootmenu)
-            # this variable should empty once it goes out of scope
-            # no need to explicitly unset to prevent dupes
-            local zfsparams=$(zfs get -H -o value org.zfsbootmenu:commandline zroot/ROOT)
-            zfs set org.zfsbootmenu:commandline="$zfsparams $1" zroot/ROOT || die
         ;;
     esac
 

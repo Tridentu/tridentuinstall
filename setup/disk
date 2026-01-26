@@ -2,8 +2,6 @@
 
 echo "Running setupdisk..."
 
-[ "$filesystem" == "zfs" ] &&
-    { commandFailure="Running zgenhostid has failed." ; zgenhostid -f 0x00bab10c || die ; }
 
 if [ -n "$wipedisk" ] && [ "$wipedisk" -gt 0 ]; then
     shred --verbose --random-source=/dev/urandom -n"$wipedisk" --zero "$diskInput" ||
@@ -74,7 +72,7 @@ fi
 mkfs.vfat "$esp" ||
     { commandFailure="Formatting ESP as vfat has failed." ; die ; }
 
-if [ "$encryption" == "Yes" ] && [ "$filesystem" != "zfs" ]; then
+if [ "$encryption" == "Yes" ]; then
 
     [ -z "$hash" ] &&
         hash="sha512"
@@ -105,12 +103,12 @@ if [ "$encryption" == "Yes" ] && [ "$filesystem" != "zfs" ]; then
 
     echo -e "${YELLOW}Opening new encrypted partition...${NC}"
     while : ; do
-        cryptsetup luksOpen "$root" void
+        cryptsetup luksOpen "$root" tridentu2
         [ "$?" -eq 0 ] && break
     done
 
     if [ "$lvm" == "Yes" ]; then
-        vgcreate void /dev/mapper/void ||
+        vgcreate tridentu2 /dev/mapper/tridentu2 ||
             { commandFailure="Creating volume group has failed." ; die ; }
     fi
 
@@ -118,18 +116,18 @@ else
     if [ "$lvm" == "Yes" ]; then
         commandFailure="Creating volume group has failed."
         pvcreate "$root" || die
-        vgcreate void "$root" || die
+        vgcreate tridentu2 "$root" || die
     fi
 fi
 
 if [ "$filesystem" == "btrfs" ]; then
     case "$encryption" in
         Yes)
-            mkfs.btrfs -L Void /dev/mapper/void || die
-            mount -o "$btrfsopts" /dev/mapper/void /mnt || die
+            mkfs.btrfs -L Tridentu2 /dev/mapper/tridentu2 || die
+            mount -o "$btrfsopts" /dev/mapper/tridentu2 /mnt || die
         ;;
         No)
-            mkfs.btrfs -L Void "$root" || die
+            mkfs.btrfs -L Tridentu2 "$root" || die
             mount -o "$btrfsopts" "$root" /mnt || die
         ;;
     esac
@@ -147,128 +145,36 @@ if [ "$filesystem" == "btrfs" ]; then
     btrfs su cr /mnt/@var || die
 
     umount /mnt || die
-elif [ "$filesystem" == "zfs" ]; then
-    commandFailure="Creating zpool has failed."
-
-    if [ "$encryption" == "Yes" ] ; then
-
-        # attempting to calculate this based on time is a fruitless endeavour
-        # default to 1 mil unless otherwise specified by the user
-        [ -z "$zfsiters" ] &&
-            zfsiters="1000000"
-
-        clear
-        while [ -z "$zfscryptpass" ] ; do
-            echo -e "${YELLOW}Enter your encryption passphrase here: (Minimum 8 characters)${NC}"
-            read -s zfscryptpass
-
-            echo -e "${YELLOW}Enter your encryption passphrase again to confirm:${NC}"
-            read -s zfscryptpassconfirm
-
-            if [ "${#zfscryptpass}" -lt 8 ]; then
-                echo -e "${RED}Passphrase must be at least 8 characters in length. Try again.${NC}"
-                unset zfscryptpass zfscryptpassconfirm
-            fi
-
-            if [ "$zfscryptpass" != "$zfscryptpassconfirm" ] ; then
-                echo -e "${RED}Passphrases do not match. Try again.${NC}"
-                unset zfscryptpass zfscryptpassconfirm
-            fi
-        done
-
-        commandFailure="Creating zroot.key has failed."
-        echo "$zfscryptpass" > /etc/zfs/zroot.key || die
-        chmod 000 /etc/zfs/zroot.key || die
-
-        # best to explicitly discard these
-        unset zfscryptpass zfscryptpassconfirm
-
-        echo "Creating encrypted zpool..."
-    fi
-
-    # https://docs.zfsbootmenu.org/en/v3.0.x/guides/void-linux/uefi.html#create-the-zpool
-    partVar=$(blkid -o value -s PARTUUID "$root")
-    if [ "$encryption" == "Yes" ]; then
-        zpool create -f -o ashift=12 \
-            -O compression="$compressionType" \
-            -O acltype=posixacl \
-            -O xattr=sa \
-            -O relatime=on \
-            -O encryption=aes-256-gcm \
-            -O keylocation=file:///etc/zfs/zroot.key \
-            -O keyformat=passphrase \
-            -O pbkdf2iters="$zfsiters" \
-            -o autotrim=on \
-            -o compatibility=openzfs-2.1-linux \
-            -m none zroot /dev/disk/by-partuuid/"$partVar" ||
-            { commandFailure="Creating zpool has failed." ; die ; }
-    else
-        zpool create -f -o ashift=12 \
-            -O compression="$compressionType" \
-            -O acltype=posixacl \
-            -O xattr=sa \
-            -O relatime=on \
-            -o autotrim=on \
-            -o compatibility=openzfs-2.1-linux \
-            -m none zroot /dev/disk/by-partuuid/"$partVar" ||
-            { commandFailure="Creating zpool has failed." ; die ; }
-    fi
-
-    echo -e "${YELLOW}Enter your encryption passphrase to unlock zroot:${NC}"
-
-    commandFailure="Creating ZFS filesystems has failed."
-    zfs create -o mountpoint=none zroot/ROOT || die
-    zfs create -o mountpoint=/ -o canmount=noauto zroot/ROOT/void || die
-
-    [ "$createHome" == "Yes" ] &&
-        { zfs create -o mountpoint=/home zroot/home || die ; }
-
-    commandFailure="Re-importing zpool has failed."
-    zpool export zroot || die
-    zpool import -N -R /mnt zroot || die
-
-    [ "$encryption" == "Yes" ] &&
-        { zfs load-key -L prompt zroot || die ; }
-
-    zfs mount zroot/ROOT/void || die
-    zfs mount -a || die
-
-    # Cache file, see https://docs.voidlinux.org/installation/guides/zfs.html
-    commandFailure="Creating ZFS pool cache file has failed."
-    mkdir -p /mnt/etc/zfs || die
-    zpool set cachefile=/mnt/etc/zfs/zpool.cache zroot || die
-
-    udevadm trigger || die
 fi
 
 if [ "$swapStyle" == "partition" ]; then
     commandFailure="Creating swap partition has failed."
     if [ "$lvm" == "Yes" ]; then
-        lvcreate --name swap -L "$swapSize" void || die
-        mkswap /dev/void/swap || die
+        lvcreate --name swap -L "$swapSize" tridentu2 || die
+        mkswap /dev/tridentu2/swap || die
     else
         mkswap "$swap" || die
     fi
 fi
 
 if [ "$rootSize" == "full" ] && [ "$lvm" == "Yes" ]; then
-    lvcreate --name root -l 100%FREE void ||
+    lvcreate --name root -l 100%FREE tridentu2 ||
         { commandFailure="Creating root LV has failed." ; die ; }
 elif [ "$rootSize" != "full" ] && [ "$lvm" == "Yes" ]; then
-    lvcreate --name root -L "$rootSize" void ||
+    lvcreate --name root -L "$rootSize" tridentu2 ||
         { commandFailure="Creating root LV has failed." ; die ; }
 fi
 
 [ "$lvm" == "Yes" ] &&
     case "$filesystem" in
-        xfs) mkfs.xfs /dev/void/root || die ;;
-        ext4) mkfs.ext4 /dev/void/root || die ;;
+        xfs) mkfs.xfs /dev/tridentu2/root || die ;;
+        ext4) mkfs.ext4 /dev/tridentu2/root || die ;;
     esac
 
 if [ "$lvm" == "No" ] && [ "$encryption" == "Yes" ]; then
     case "$filesystem" in
-        xfs) mkfs.xfs /dev/mapper/void || die ;;
-        ext4) mkfs.ext4 /dev/mapper/void || die ;;
+        xfs) mkfs.xfs /dev/mapper/tridentu2 || die ;;
+        ext4) mkfs.ext4 /dev/mapper/tridentu2 || die ;;
     esac
 elif [ "$lvm" == "No" ] && [ "$encryption" == "No" ]; then
     case "$filesystem" in
@@ -281,14 +187,14 @@ if [ -n "$homeSize" ] && [ "$lvm" == "Yes" ]; then
     commandFailure="Creating home LV has failed."
     if [ -n "$homeSize" ]; then
         if [ "$homeSize" == "full" ]; then
-            lvcreate --name home -l 100%FREE void || die
+            lvcreate --name home -l 100%FREE tridentu2 || die
         else
-            lvcreate --name home -L "$homeSize" void || die
+            lvcreate --name home -L "$homeSize" tridentu2 || die
         fi
 
         case "$filesystem" in
-            xfs) mkfs.xfs /dev/void/home || die ;;
-            ext4) mkfs.ext4 /dev/void/home || die ;;
+            xfs) mkfs.xfs /dev/tridentu2/home || die ;;
+            ext4) mkfs.ext4 /dev/tridentu2/home || die ;;
         esac
     fi
 elif [ -n "$home" ] && [ "$lvm" == "No" ]; then
@@ -301,36 +207,36 @@ fi
 
 commandFailure="Mounting partitions has failed."
 [ "$lvm" == "Yes" ] &&
-    { mount /dev/void/root /mnt || die ; }
+    { mount /dev/tridentu2/root /mnt || die ; }
 
-[ "$lvm" == "No" ] && [ "$encryption" == "Yes" ] && [ "$filesystem" != "zfs" ] &&
-    { mount /dev/mapper/void /mnt || die ; }
+[ "$lvm" == "No" ] && [ "$encryption" == "Yes" ]  &&
+    { mount /dev/mapper/tridentu2 /mnt || die ; }
 
-[ "$lvm" == "No" ] && [ "$encryption" == "No" ] && [ "$filesystem" != "zfs" ] &&
+[ "$lvm" == "No" ] && [ "$encryption" == "No" ]  &&
     { mount "$root" /mnt || die ; }
 
-[ "$lvm" == "No" ] && [ -n "$home" ] && [ "$filesystem" != "btrfs" ] && [ "$filesystem" != "zfs" ] &&
+[ "$lvm" == "No" ] && [ -n "$home" ] && [ "$filesystem" != "btrfs" ] &&
     { mkdir /mnt/home ; mount "$home" /mnt/home || die ; }
 
-[ "$lvm" == "Yes" ] && [ -e "/dev/mapper/void-home" ] &&
-    { mkdir /mnt/home ; mount /dev/mapper/void-home /mnt/home || die ; }
+[ "$lvm" == "Yes" ] && [ -e "/dev/mapper/tridentu2-home" ] &&
+    { mkdir /mnt/home ; mount /dev/mapper/tridentu2-home /mnt/home || die ; }
 
 if [ "$filesystem" == "btrfs" ]; then
     case "$encryption" in
         Yes)
-            mount -o "$btrfsopts",subvol=@ /dev/mapper/void /mnt || die
+            mount -o "$btrfsopts",subvol=@ /dev/mapper/tridentu2 /mnt || die
 
             mkdir /mnt/.snapshots || die
 
             [ "$createHome" == "Yes" ] &&
-                { mkdir /mnt/home ; mount -o "$btrfsopts",subvol=@home /dev/mapper/void /mnt/home || die ; }
+                { mkdir /mnt/home ; mount -o "$btrfsopts",subvol=@home /dev/mapper/tridentu2 /mnt/home || die ; }
 
-            mount -o "$btrfsopts",subvol=@snapshots /dev/mapper/void /mnt/.snapshots || die
+            mount -o "$btrfsopts",subvol=@snapshots /dev/mapper/tridentu2 /mnt/.snapshots || die
 
             [ "$swapStyle" == "swapfile" ] &&
-                { mkdir /mnt/swap ; mount -o rw,nodatacow,compress=none,subvol=@swap /dev/mapper/void /mnt/swap || die ; }
+                { mkdir /mnt/swap ; mount -o rw,nodatacow,compress=none,subvol=@swap /dev/mapper/tridentu2 /mnt/swap || die ; }
 
-            mkdir -p /mnt/var ; mount -o "$btrfsopts",nodatacow,subvol=@var /dev/mapper/void /mnt/var || die
+            mkdir -p /mnt/var ; mount -o "$btrfsopts",nodatacow,subvol=@var /dev/mapper/tridentu2 /mnt/var || die
         ;;
         No)
             mount -o "$btrfsopts",subvol=@ "$root" /mnt || die

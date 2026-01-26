@@ -1,23 +1,19 @@
 #!/bin/bash
 
 # Source installer library
-. "/tmp/libviss" ||
-    { echo "/tmp/libviss not found. Cannot continue." ; exit 1 ; }
+. "/tmp/libtridentuis" ||
+    { echo "/tmp/libtridentuis not found. Cannot continue." ; exit 1 ; }
 
 . "/tmp/installerOptions" ||
     { commandFailure="Sourcing installer variable file on the new system has failed." ; die ; }
 
 exitFunction () {
-    xbps-reconfigure -fa ||
-        { commandFailure="xbps-reconfigure has failed." ; die ; }
 
-    [ "$bootloader" == "zfsbootmenu" ] &&
-        { commandFailure="Creating zbm boot entry has failed." ; efibootmgr --create --label "Void Linux" --disk "$diskInput" --part 1 --loader "\EFI\boot\bootx64.EFI" ; }
-
-    if [ "$bootloader" == "uki" ] || [ "$bootloader" == "zfsbootmenu" ]; then
+    
+    if [ "$bootloader" == "uki" ]; then
         # For one reason or another, some systems seem to remove our entry without setting it as next to boot.
         commandFailure="Setting default boot entry has failed."
-        bootEntry=$(efibootmgr --unicode | grep "Void Linux" | while read c1 c2; do echo $c1; done | sed 's/Boot//g' | sed 's/*//g') || die
+        bootEntry=$(efibootmgr --unicode | grep "Tridentu 2" | while read c1 c2; do echo $c1; done | sed 's/Boot//g' | sed 's/*//g') || die
         efibootmgr --bootorder $bootEntry || die
     fi
 
@@ -53,11 +49,8 @@ commandFailure="Setting root directory permissions has failed."
 chown root:root / || die
 chmod 755 / || die
 
-[ -e /etc/sv/dbus ] &&
-    { ln -s /etc/sv/dbus /var/service || { commandFailure="Enabling dbus has failed." ; die ; } ; }
 
 [ "$encryption" == "Yes" ] &&
-    if [ "$bootloader" == "grub" ]; then
         commandFailure="Configuring LUKS key has failed."
 
         echo -e "Configuring LUKS key... \n"
@@ -66,53 +59,17 @@ chmod 755 / || die
         cryptsetup luksAddKey "$root" /boot/volume.key || die
         chmod 000 /boot/volume.key || die
         chmod -R g-rwx,o-rwx /boot || die
-    fi
 
 case "$bootloader" in
-    uki)
-        mkdir -p /boot/efi/EFI/boot ||
-            { commandFailure="Creating ESP path has failed." ; die ; }
-
-        # Force kernel reconfigure to build the UKI
-        commandFailure="Forced kernel reconfigure has failed."
-        chmod +x /etc/kernel.d/post-install/60-ukify || die
-        xbps-reconfigure -f linux"$(find /boot -name vmlinuz\* | tr -d "/boot/vmlinuz-" | cut -f1,2 -d".")" || die
-
-        # This should never need to be regenerated assuming the EFI executable is kept where it's at.
-        efibootmgr --create --label "Void Linux" --disk "$diskInput" --part 1 --loader "\EFI\boot\bootx64.efi" ||
-            { commandFailure="Creating EFI boot entry has failed." ; die ; }
-    ;;
     grub)
-        grub-install --removable --target=x86_64-efi --efi-directory=/boot/efi ||
+        build-grub ||
             { commandFailure="GRUB installation has failed." ; die ; }
-    ;;
-    zfsbootmenu)
-        generate-zbm ||
-            { commandFailure="Generating ZBM image has failed." ; die ; }
     ;;
 esac
 
 ln -sf /usr/share/zoneinfo/"$timezone" /etc/localtime ||
     { commandFailure="Setting timezone has failed." ; die ; }
 
-if [ "$su" == "doas" ]; then
-    commandFailure="doas configuration has failed."
-    touch /etc/doas.conf || die
-    chown -c root:root /etc/doas.conf || die
-    chmod -c 0400 /etc/doas.conf || die
-    ln -s $(which doas) /usr/bin/sudo || die
-fi
-
-if [ "$desktop" == "gnome" ]; then
-    # Cursed fix for gdm not providing a Wayland option if the Nvidia driver is in use, found here: https://wiki.archlinux.org/title/GDM#Wayland_and_the_proprietary_NVIDIA_driver
-    commandFailure="Modifying udev rules for gdm has failed."
-    if [ -e /usr/bin/nvidia-smi ]; then
-        [ ! -d /etc/udev/rules.d ] &&
-            { mkdir -p /etc/udev/rules.d || die ; }
-
-        ln -s /dev/null /etc/udev/rules.d/61-gdm.rules || die
-    fi
-fi
 
 if [ -z "$username" ]; then
     clear
@@ -120,27 +77,15 @@ if [ -z "$username" ]; then
 else
     commandFailure="Creating user has failed."
     useradd "$username" -m -d /home/"$username" || die
-    usermod -aG audio,video,kvm "$username" || die
+    usermod -aG audio,video,kvm,netdev "$username" || die
     clear
     echo -ne "Should user "$username" be a superuser? (y/n) "
     read superPrompt
 
     if [ $superPrompt == "y" ] || [ $superPrompt == "Y" ]; then
         usermod -aG wheel "$username" || die
-        if [ "$su" == "sudo" ]; then
-            sed -i -e 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g' /etc/sudoers || die
-        elif [ "$su" == "doas" ]; then
-            echo "permit :wheel" >> /etc/doas.conf || die
-        fi
+        sed -i -e 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g' /etc/sudoers || die
     fi
-
-    # Create users home directories, such as ~/Downloads
-    case "$desktop" in
-        sway|swayfx|wayfire|i3|niri|river)
-            su "$username" -c 'xdg-user-dirs-update' ||
-                { commandFailure="Executing xdg-user-dirs-update has failed." ; die ; }
-        ;;
-    esac
 
     clear
     rootPassword

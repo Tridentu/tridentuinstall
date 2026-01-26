@@ -4,8 +4,8 @@
 # This keeps the installer cleaner and easier to manipulate.
 
 # Source installer library
-. "$(pwd)/misc/libviss" ||
-    { echo "$(pwd)/lib/libvis not found. Cannot continue." ; exit 1 ; }
+. "$(pwd)/misc/libtridentuis" ||
+    { echo "$(pwd)/lib/libtridentuis not found. Cannot continue." ; exit 1 ; }
 
 # Source basic installer setup script
 . "$(pwd)/setup/installer" ||
@@ -28,7 +28,7 @@ diskConfig() {
     local diskList=$(lsblk -d -o NAME,SIZE -n -e7)
     local diskIndicator=$(lsblk -o NAME,SIZE,TYPE -e7)
 
-    if diskInput=$(drawDialog --begin 2 2 --title "Available Disks" --infobox "$diskIndicator" 0 0 --and-widget --title "Partitioner" --menu "The disk you choose will not be modified until you confirm your installation options.\n\nPlease choose the disk you would like to partition and install Void Linux to:" 0 0 0 $diskList) ; then
+    if diskInput=$(drawDialog --begin 2 2 --title "Available Disks" --infobox "$diskIndicator" 0 0 --and-widget --title "Partitioner" --menu "The disk you choose will not be modified until you confirm your installation options.\n\nPlease choose the disk you would like to partition and install Tridentu 2 to:" 0 0 0 $diskList) ; then
         diskInput="/dev/$diskInput"
     else
         exit 0
@@ -51,9 +51,9 @@ diskConfig() {
     fi
 
     if [ "$zfspossible" != "no" ] ; then
-        filesystem=$(drawDialog --no-cancel --title "Partitioner - Filesystem" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'ext4'" 0 0 0 "ext4" "" "xfs" "" "btrfs" "(Experimental)" "zfs" "(Experimental)")
+        filesystem=$(drawDialog --no-cancel --title "Partitioner - Filesystem" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'ext4' OR 'btrfs'" 0 0 0 "ext4" "" "xfs" "" "btrfs" "" "zfs" "(Experimental)")
     else
-        filesystem=$(drawDialog --no-cancel --title "Partitioner - Filesystem" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'ext4'" 0 0 0 "ext4" "" "xfs" "" "btrfs" "(Experimental)")
+        filesystem=$(drawDialog --no-cancel --title "Partitioner - Filesystem" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'ext4' OR 'btrfs'" 0 0 0 "ext4" "" "xfs" "" "btrfs" "")
     fi
     [ "$?" == "3" ] && dungeonmap
 
@@ -138,9 +138,7 @@ diskConfig() {
 }
 
 suConfig() {
-    su=$(drawDialog --no-cancel --title "SU Choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'sudo'" 0 0 0 "sudo" "" "doas" "" "none" "")
-    [ "$?" == "3" ] && dungeonmap
-
+    su="sudo"
     kernelConfig
 }
 
@@ -168,11 +166,8 @@ bootloaderConfig() {
 initrdConfig() {
     [ "$filesystem" == "zfs" ] &&
         { initrd="dracut" && hostnameConfig ; }
-    # TODO: need to test tinyramfs with zfs
-    # TODO: is mkinitcpio worthwhile to include?
 
-    initrd=$(drawDialog --no-cancel --title "Initramfs choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'dracut'"  0 0 0 "dracut" "- Default Void initramfs generator" "tinyramfs" "- Small POSIX Shell initramfs generator")
-    [ "$?" == "3" ] && dungeonmap
+    initrd="dracut"
 
     hostnameConfig
 }
@@ -222,48 +217,16 @@ localeConfig() {
     locale="LANG=$localeChoice"
     libclocale="$localeChoice UTF-8"
 
-    repositoryConfig
+    modulesConfig
 }
 
-repositoryConfig() {
-    if drawDialog --title "Repository Mirror" --extra-button --extra-label "Map" --yesno "Would you like to set your repo mirror?\n\nIf not, repo-default will be used." 0 0 ; then
-        xmirror
-        repository=$(cat /etc/xbps.d/*-repository-main.conf | sed 's/repository=//g')
-    else
-        [ "$?" == "3" ] && dungeonmap
-        [ "$libc" == "glibc" ] && repository="https://repo-default.voidlinux.org/current"
-        [ "$libc" == "musl" ] && repository="https://repo-default.voidlinux.org/current/musl"
-    fi
 
-    [ "$libc" == "glibc" ] && ARCH="x86_64"
-    [ "$libc" == "musl" ] && ARCH="x86_64-musl"
+# networkConfig() {
+#     network=$(drawDialog --no-cancel --title "Networking - DHCP client" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'NetworkManager'\n\nIf 'none' is chosen, dhcpcd will still be included but not enabled." 0 0 0 "NetworkManager" "" "dhcpcd" "" "none" "")
+#     [ "$?" == "3" ] && dungeonmap
 
-    graphicsConfig
-}
-
-graphicsConfig() {
-    if [ "$libc" == "glibc" ]; then
-        graphics=$(drawDialog --title 'Graphics Drivers' --extra-button --extra-label "Map" --checklist 'Select graphics drivers, or choose 'Skip' if you would like to skip:' 0 0 0 'intel' '' 'off' 'intel-32bit' '' 'off' 'amd' '' 'off' 'amd-32bit' '' 'off' 'nvidia' '- Proprietary driver' 'off' 'nvidia-32bit' '' 'off' 'nvidia-nouveau' '- Nvidia Nouveau driver (experimental)' 'off' 'nvidia-nouveau-32bit' '' 'off')
-        [ "$?" == "3" ] && dungeonmap
-    fi
-
-    if [ "$libc" == "musl" ]; then
-        graphics=$(drawDialog --title 'Graphics Drivers' --extra-button --extra-label "Map" --checklist 'Select graphics drivers, or choose 'Skip' if you would like to skip: ' 0 0 0 'intel' '' 'off' 'amd' '' 'off' 'nvidia-nouveau' '- Nvidia Nouveau driver (experimental)' 'off')
-        [ "$?" == "3" ] && dungeonmap
-    fi
-
-    [ -n "$graphics" ] &&
-        IFS=" " read -r -a graphicsArray <<< "$graphics"
-
-    networkConfig
-}
-
-networkConfig() {
-    network=$(drawDialog --no-cancel --title "Networking - DHCP client" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'NetworkManager'\n\nIf 'none' is chosen, dhcpcd will still be included but not enabled." 0 0 0 "NetworkManager" "" "dhcpcd" "" "none" "")
-    [ "$?" == "3" ] && dungeonmap
-
-    audioConfig
-}
+#     audioConfig
+# }
 
 audioConfig() {
     audio=$(drawDialog --no-cancel --title "Audio Server" --extra-button --extra-label "Map" --menu "If you are unsure, 'pipewire' is recommended." 0 0 0 "pipewire" "" "pulseaudio" "" "none" "")
@@ -272,17 +235,17 @@ audioConfig() {
     desktopConfig
 }
 
-desktopConfig() {
-    desktop=$(drawDialog --no-cancel --title "Desktop Environment" --extra-button --extra-label "Map" --menu "" 0 0 0 "gnome" "" "i3" "" "kde" "" "mate" "" "niri" "" "river" "" "sway" "" "swayfx" "" "wayfire" "" "xfce" "" "none" "")
-    [ "$?" == "3" ] && dungeonmap
+# desktopConfig() {
+#     desktop=$(drawDialog --no-cancel --title "Desktop Environment" --extra-button --extra-label "Map" --menu "" 0 0 0 "gnome" "" "i3" "" "kde" "" "mate" "" "niri" "" "river" "" "sway" "" "swayfx" "" "wayfire" "" "xfce" "" "none" "")
+#     [ "$?" == "3" ] && dungeonmap
 
-    case "$desktop" in
-        sway|swayfx|wayfire|niri|river) drawDialog --title "" --extra-button --extra-label "Map" --yesno "Would you like to install greetd with $desktop?" 0 0 && greetd="Yes" ;;
-        i3) drawDialog --title "" --extra-button --extra-label "Map" --yesno "Would you like to install lightdm with $desktop?" 0 0 && lightdm="Yes" ;;
-    esac
+#     case "$desktop" in
+#         sway|swayfx|wayfire|niri|river) drawDialog --title "" --extra-button --extra-label "Map" --yesno "Would you like to install greetd with $desktop?" 0 0 && greetd="Yes" ;;
+#         i3) drawDialog --title "" --extra-button --extra-label "Map" --yesno "Would you like to install lightdm with $desktop?" 0 0 && lightdm="Yes" ;;
+#     esac
 
-    modulesConfig
-}
+#     modulesConfig
+# }
 
 modulesConfig() {
     # Unset to prevent duplicates
@@ -299,7 +262,7 @@ modulesConfig() {
     done
 
     # Using dash here as a simple solution to it misbehaving when ran with bash
-    modules=( $(sh -c "dialog --stdout --title 'Extra Options' --extra-button --extra-label "Map" --no-mouse --backtitle "https://github.com/kkrruumm/void-install-script" --checklist 'Enable or disable extra install options: ' 0 0 0 $(echo "${modulesDialogArray[@]}")") )
+    modules=( $(sh -c "dialog --stdout --title 'Extra Options' --extra-button --extra-label "Map" --no-mouse --backtitle "https://github.com/Tridentu/tridentuinstall" --checklist 'Enable or disable extra install options: ' 0 0 0 $(echo "${modulesDialogArray[@]}")") )
     [ "$?" == "3" ] && dungeonmap
 
     confirm
@@ -316,8 +279,6 @@ confirm() {
     [ "$basesystem" != "base-system" ] &&
         settings="Base system: custom\n"
 
-    settings+="Repo mirror: $repository\n"
-    settings+="Bootloader: $bootloader\n"
     settings+="Kernel: $kernel\n"
     settings+="Initramfs: $initrd\n"
     settings+="Target disk: $diskInput\n"
@@ -362,29 +323,8 @@ confirm() {
     [ -n "$username" ] &&
         settings+="User: $username\n"
 
-    [ -n "$desktop" ] &&
-        settings+="DE/WM: $desktop\n"
-
-    [ -n "$network" ] &&
-        settings+="DHCP client: $network\n"
-
     [ -n "$audio" ] &&
         settings+="Audio server: $audio\n"
-
-    [ -n "$graphics" ] &&
-        settings+="Graphics drivers: $graphics\n"
-
-    [ "$desktop" == "i3" ] && [ -n "$lightdm" ] &&
-        settings+="Install lightdm with i3?: $lightdm\n"
-
-    for i in sway swayfx niri wayfire
-    do
-        if [ "$desktop" == "$i" ]; then
-            [ -z "$greetd" ] && greetd="No"
-            settings+="Install greetd with $desktop?: $greetd\n"
-            break
-        fi
-    done
 
     [ -n "$modules" ] &&
         settings+="Enabled modules: ${modules[@]}\n"
@@ -407,23 +347,16 @@ To change any of these settings, choose 'Map'." 0 0
 }
 
 dungeonmap() {
-    waypoint=$(drawDialog --no-cancel --title "Dungeon Map" --menu "Choose a section to jump to:" 0 0 0 "Disk" "" "SU" "" "Kernel" "" "Bootloader" "" "Initramfs" "" "Hostname" "" "User" "" "Timezone" "" "Locale" "" "Repository" "" "Graphics" "" "Network" "" "Audio" "" "Desktop" "" "Modules" "" "Overview" "")
+    waypoint=$(drawDialog --no-cancel --title "Dungeon Map" --menu "Choose a section to jump to:" 0 0 0 "Disk" "" "" "Kernel" "" "Hostname" "" "User" "" "Timezone" "" "Locale" "" "Audio" "" "Modules" "" "Overview" "")
 
     case "$waypoint" in
         Disk) diskConfig ;;
-        SU) suConfig ;;
         Kernel) kernelConfig ;;
-        Bootloader) bootloaderConfig ;;
-        Initramfs) initrdConfig ;;
         Hostname) hostnameConfig ;;
         User) userConfig ;;
         Timezone) timezoneConfig ;;
         Locale) localeConfig ;;
-        Repository) repositoryConfig ;;
-        Graphics) graphicsConfig ;;
-        Network) networkConfig ;;
         Audio) audioConfig ;;
-        Desktop) desktopConfig ;;
         Modules) modulesConfig ;;
         Overview) confirm ;;
     esac
@@ -437,13 +370,12 @@ _install() {
     commandFailure="System chroot has failed."
     cp /etc/resolv.conf /mnt/etc/resolv.conf || die
 
-    syschrootVarPairs=("bootloader $bootloader" \
+    syschrootVarPairs=("bootloader grub" \
         "su $su" \
         "timezone $timezone" \
         "encryption $encryption" \
         "diskInput $diskInput" \
         "username $username" \
-        "desktop $desktop" \
         "root $root")
 
     for i in "${syschrootVarPairs[@]}"
@@ -452,7 +384,7 @@ _install() {
         echo "$1='$2'" >> /mnt/tmp/installerOptions || die
     done
 
-    cp -f "$(pwd)"/misc/libviss /mnt/tmp/libviss || die
+    cp -f "$(pwd)"/misc/libtridentuis /mnt/tmp/libtridentuis || die
     cp -f "$(pwd)"/setup/chroot /mnt/tmp/chroot || die
     system "/bin/bash /tmp/chroot"
 
@@ -471,12 +403,11 @@ _install() {
 
     [ "$kernelparam_update" == "true" ] &&
         case "$bootloader" in
-            grub) system 'update-grub' ;;
-            uki) system 'xbps-reconfigure -f linux"$(find /boot -name vmlinuz\* | tr -d "/boot/vmlinuz-" | cut -f1,2 -d".")"' ;;
+            grub) system 'build-grub' ;;
+#            uki) system 'xbps-reconfigure -f linux"$(find /boot -name vmlinuz\* | tr -d "/boot/vmlinuz-" | cut -f1,2 -d".")"' ;;
         esac
 
     # clean the xbps cache of any removed packages that were removed by the user via post_install or by the installer itself
-    system "xbps-remove -ROO"
 
     clear
 

@@ -1,139 +1,24 @@
 #!/bin/bash
 
-commandFailure="Copying XBPS keys has failed."
-mkdir -p /mnt/var/db/xbps/keys || die
-cp /var/db/xbps/keys/* /mnt/var/db/xbps/keys || die
-
 commandFailure="Base system installation has failed."
 
-case "$basesystem" in
-    base-system)
-        XBPS_ARCH=$ARCH install base-system
-
-        [ "$lvm" == "Yes" ] &&
-            install lvm2
-
-        # Forcing zfs native crypt for the time being.
-        [ "$filesystem" != "zfs" ] &&
-            { [ "$encryption" == "Yes" ] && install cryptsetup ; }
-
-        if [ "$kernel" != "linux" ] ; then
-            echo "ignorepkg=linux" >> /mnt/etc/xbps.d/ignore.conf || die
-            install "$kernel"
-            system "xbps-remove -ROoy linux"
-
-            # having any kernel around except for the target will confuse setup/chroot
-            # when it goes to find the kernel to reconfigure when building a UKI
-            system "vkpurge rm all" # use vkpurge to clean up /boot
-        fi
-
-        if [ "$su" != "sudo" ]; then
-            echo "ignorepkg=sudo" >> /mnt/etc/xbps.d/ignore.conf || die
-            system "xbps-remove -ROoy sudo"
-        fi
-
-        if [ "$initrd" != "dracut" ]; then
-            echo "ignorepkg=dracut" >> /mnt/etc/xbps.d/ignore.conf || die
-            system "xbps-remove -ROoy dracut"
-
-            install "$initrd"
-        else
-            install binutils # allow dracut to strip the initramfs
-        fi
-
-        [ "$su" == "doas" ] &&
-            install opendoas
-
-        if [[ ! ${modules[@]} =~ "wifi-firmware" ]]; then
-            echo "ignorepkg=wifi-firmware" >> /mnt/etc/xbps.d/ignore.conf || die
-            echo "ignorepkg=iw" >> /mnt/etc/xbps.d/ignore.conf || die
-            echo "ignorepkg=wpa_supplicant" >> /mnt/etc/xbps.d/ignore.conf || die
-
-            system "xbps-remove -ROoy wifi-firmware iw wpa_supplicant"
-        fi
-    ;;
-    *)
-        XBPS_ARCH=$ARCH install $basesystem
-
-        install "$kernel"
-
-        [ "$filesystem" != "zfs" ] &&
-            { [ "$encryption" == "Yes" ] && install cryptsetup ; }
-
-        [ "$lvm" == "Yes" ] &&
-            install lvm2
-
-        case "$su" in
-            sudo) install sudo ;;
-            doas) install opendoas ;;
-        esac
-
-        # despite defining a custom basesystem, dracut is likely
-        # to be pulled in as a dependency, ignore it and remove
-        # if it exists:
-        if [ "$initrd" != "dracut" ]; then
-            echo "ignorepkg=dracut" >> /mnt/etc/xbps.d/ignore.conf || die
-            system "xbps-remove -ROoy dracut"
-        fi
-
-        install "$initrd"
-
-        [ "$initrd" == "dracut" ] &&
-            install binutils # allow dracut to strip the initramfs
-
-        install dosfstools
-
-        # zfsbootmenu will automatically pull in zfs
-        case "$filesystem" in
-            xfs) install xfsprogs ;;
-            ext4) install e2fsprogs ;;
-            btrfs) install btrfs-progs ;;
-        esac
-    ;;
-esac
-
-[ -n "$bootloader" ] && [ "$bootloader" != "none" ] &&
-    commandFailure="Bootloader package installation has failed"
-
-case "$bootloader" in
-    uki) install efibootmgr ukify systemd-boot-efistub ;;
-    grub) install grub-x86_64-efi ;;
-    zfsbootmenu) install zfsbootmenu systemd-boot-efistub efibootmgr ;;
-esac
-
-if [ "$bootloader" == "zfsbootmenu" ]; then
-    commandFailure="Copying hostid to the new install has failed."
-    cp /etc/hostid /mnt/etc || die
-
-    [ "$encryption" == "Yes" ] &&
-        { commandFailure="Copying zroot key to the new install has failed." ; cp /etc/zfs/zroot.key /mnt/etc/zfs || die ; }
-fi
-
-commandFailure="Creating $kernel virtualpkg has failed."
-case "$kernel" in
-    linux-lts) echo "virtualpkg=linux-headers:linux-lts-headers" >> /mnt/etc/xbps.d/headers.conf || die ;;
-    linux-mainline) echo "virtualpkg=linux-headers:linux-mainline-headers" >> /mnt/etc/xbps.d/headers.conf || die ;;
-esac
-
-if [ "$repository" != "https://repo-default.voidlinux.org/current" ] && [ "$repository" != "https://repo-default.voidlinux.org/current/musl" ]; then
-    xmirror -s "$repository" -r /mnt ||
-        { commandFailure="Repository configuration has failed." ; die ; }
-fi
+installSquashModule "01"
+installSquashModule "02"
 
 commandFailure="Confuring fstab has failed."
 partVar=$(blkid -o value -s UUID "$esp")
 echo "UUID=$partVar /boot/efi vfat defaults 0 0" >> /mnt/etc/fstab || die
 
 [ "$lvm" == "Yes" ] &&
-    { echo "/dev/void/root / $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
+    { echo "/dev/tridentu2/root / $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
 
-[ "$lvm" == "No" ] && [ "$encryption" == "Yes" ] && [ "$filesystem" != "btrfs" ] && [ "$filesystem" != "zfs" ] &&
-    { partVar=$(blkid -o value -s UUID /dev/mapper/void) ; echo "UUID=$partVar / $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
+[ "$lvm" == "No" ] && [ "$encryption" == "Yes" ] && [ "$filesystem" != "btrfs" ] &&
+    { partVar=$(blkid -o value -s UUID /dev/mapper/tridentu2) ; echo "UUID=$partVar / $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
 
 if [ "$filesystem" == "btrfs" ]; then
     case "$encryption" in
         Yes)
-            partVar=$(blkid -o value -s UUID /dev/mapper/void)
+            partVar=$(blkid -o value -s UUID /dev/mapper/tridentu2)
             echo "UUID=$partVar / $filesystem $btrfsopts,subvol=@ 0 1" >> /mnt/etc/fstab || die
 
             [ "$createHome" == "Yes" ] &&
@@ -163,13 +48,13 @@ if [ "$filesystem" == "btrfs" ]; then
     esac
 fi
 
-[ "$lvm" == "No" ] && [ "$encryption" == "No" ] && [ "$filesystem" != "btrfs" ] && [ "$filesystem" != "zfs" ] &&
+[ "$lvm" == "No" ] && [ "$encryption" == "No" ] && [ "$filesystem" != "btrfs" ] &&
     { partVar=$(blkid -o value -s UUID "$root") ; echo "UUID=$partVar / $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
 
 [ -n "$swapSize" ] && [ "$swapStyle" == "partition" ] && [ "$lvm" == "Yes" ] &&
-    { echo "/dev/void/swap swap swap defaults 0 0" >> /mnt/etc/fstab || die ; }
+    { echo "/dev/tridentu2/swap swap swap defaults 0 0" >> /mnt/etc/fstab || die ; }
 
-[ -n "$swapSize" ] && [ "$swapStyle" == "partition" ] && [ "$lvm" == "No" ] && [ "$filesystem" != "zfs" ] &&
+[ -n "$swapSize" ] && [ "$swapStyle" == "partition" ] && [ "$lvm" == "No" ] && 
     { partVar=$(blkid -o value -s UUID "$swap") ; echo "UUID=$partVar swap swap defaults 0 0" >> /mnt/etc/fstab || die ; }
 
 [ -n "$swapSize" ] && [ "$swapStyle" == "swapfile" ] && [ "$filesystem" != "btrfs" ] &&
@@ -179,13 +64,12 @@ fi
     { echo "/swap/swapfile none swap defaults 0 0" >> /mnt/etc/fstab || die ; }
 
 [ "$separateHomePossible" != "No" ] && [ -n "$homeSize" ] && [ "$lvm" == "Yes" ] &&
-    { echo "/dev/void/home /home $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
+    { echo "/dev/tridentu2/home /home $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
 
-[ -n "$homeSize" ] && [ "$lvm" == "No" ] && [ "$filesystem" != "zfs" ] &&
+[ -n "$homeSize" ] && [ "$lvm" == "No" ] && 
     { partVar=$(blkid -o value -s UUID "$home") ; echo "UUID=$partVar /home $filesystem defaults 0 0" >> /mnt/etc/fstab || die ; }
 
-if [ "$initrd" == "dracut" ]; then
-    case "$bootloader" in
+case "$bootloader" in
         uki)
             commandFailure="Configuring ukify kernel hook has failed."
             cp "$(pwd)/misc/60-ukify" /mnt/etc/kernel.d/post-install/60-ukify || die
@@ -194,15 +78,15 @@ if [ "$initrd" == "dracut" ]; then
             commandFailure="Configuring uki base kernel parameters has failed."
             partVar=$(blkid -o value -s UUID "$root")
             [ "$lvm" == "Yes" ] && [ "$encryption" == "Yes" ] &&
-                setKernelParam "rd.luks.uuid=$partVar root=/dev/void/root rootfstype=$filesystem rw"
+                setKernelParam "rd.luks.uuid=$partVar root=/dev/tridentu2/root rootfstype=$filesystem rw"
 
             [ "$lvm" == "Yes" ] && [ "$encryption" == "No" ] &&
-                setKernelParam "rd.lvm.vg=void root=/dev/void/root rootfstype=$filesystem rw"
+                setKernelParam "rd.lvm.vg=tridentu2 root=/dev/tridentu2/root rootfstype=$filesystem rw"
 
             if [ "$lvm" == "No" ] && [ "$encryption" == "No" ]; then
                 setKernelParam "root=UUID=$partVar rootfstype=$filesystem rw"
             elif [ "$lvm" == "No" ] && [ "$encryption" == "Yes" ]; then
-                setKernelParam "rd.luks.uuid=$partVar rd.luks.name=$partVar=void-root root=/dev/mapper/void-root rootfstype=$filesystem rw"
+                setKernelParam "rd.luks.uuid=$partVar rd.luks.name=$partVar=tridentu2-root root=/dev/mapper/tridentu2-root rootfstype=$filesystem rw"
             fi
 
             [ "$filesystem" == "btrfs" ] &&
@@ -213,94 +97,21 @@ if [ "$initrd" == "dracut" ]; then
             if [ "$encryption" == "Yes" ]; then
                 partVar=$(blkid -o value -s UUID "$root")
                 [ "$lvm" == "Yes" ] &&
-                    setKernelParam "rd.lvm.vg=void rd.luks.uuid=$partVar"
+                    setKernelParam "rd.lvm.vg=tridentu2 rd.luks.uuid=$partVar"
 
                 [ "$lvm" == "No" ] &&
                     setKernelParam "rd.luks.uuid=$partVar"
 
                 echo "GRUB_ENABLE_CRYPTODISK=y" >> /mnt/etc/default/grub || die
 
-                echo "void   UUID=$partVar   /boot/volume.key   luks" >> /mnt/etc/crypttab || die
+                echo "tridentu2   UUID=$partVar   /boot/volume.key   luks" >> /mnt/etc/crypttab || die
                 echo 'install_items+=" /boot/volume.key /etc/crypttab "' >> /mnt/etc/dracut.conf.d/10-crypt.conf || die
             fi
-            ;;
-        zfsbootmenu)
-            commandFailure="Configuring zfsbootmenu has failed."
-            zfs set org.zfsbootmenu:commandline="loglevel=4" zroot/ROOT || die
-            [ "$encryption" == "Yes" ] &&
-                { zfs set org.zfsbootmenu:keysource="zroot/ROOT/void" zroot || die ; }
-
-            commandFailure="Configuring dracut for ZFS has failed."
-            cp "misc/zol.conf" /mnt/etc/dracut.conf.d/zol.conf || die
-
-            [ "$encryption" == "Yes" ] &&
-                { echo 'install_items+=" /etc/zfs/zroot.key "' >> /mnt/etc/dracut.conf.d/zol.conf || die ; }
-
-            commandFailure="Copying zbm config to new system has failed."
-            cp "misc/zbmconfig.yaml" /mnt/etc/zfsbootmenu/config.yaml || die
             ;;
     esac
 
     [ "$initrdhostonly" == "true" ] &&
         { echo 'hostonly="yes"' >> /mnt/etc/dracut.conf || die ; }
-
-elif [ "$initrd" == "tinyramfs" ]; then
-    case "$bootloader" in
-        uki)
-            commandFailure="Configuring ukify kernel hook has failed."
-            cp "$(pwd)/misc/60-ukify" /mnt/etc/kernel.d/post-install/60-ukify || die
-            chmod 744 /mnt/etc/kernel.d/post-install/60-ukify || die
-        ;;
-        grub)
-            commandFailure="Configuring grub base config has failed."
-            echo "GRUB_ENABLE_CRYPTODISK=y" >> /mnt/etc/default/grub || die
-        ;;
-    esac
-
-    # making an exception to the "style" of this script given how
-    # spammed this path is here
-    trfsconfig="/mnt/etc/tinyramfs/config"
-
-    commandFailure="Editing tinyramfs config has failed."
-    partVar=$(blkid -o value -s UUID "$root")
-    sed -i '/root=/d' "$trfsconfig" || die
-    if [ "$encryption" == "Yes" ]; then
-        echo 'luks_name=void' >> "$trfsconfig" || die
-        sed -i 's/hooks="eudev"/hooks="eudev,luks"/g' "$trfsconfig" || die
-        echo "luks_root=UUID=${partVar}" >> "$trfsconfig" || die
-        partVar=$(blkid -o value -s UUID /dev/mapper/void)
-
-        # the order hooks are included in is also the order they will be executed in,
-        # lvm must come *after* luks so tinyramfs will unlock before
-        # attempting to activate the "void" volume group
-        [ "$lvm" == "Yes" ] &&
-            { sed -i 's/hooks="eudev,luks"/hooks="eudev,luks,lvm"/g' "$trfsconfig" || die ; }
-
-        # eliminate the need to enter passphrase twice
-        # once /boot has been decrypted
-        [ "$bootloader" == "grub" ] &&
-            { echo 'luks_key=/boot/volume.key' >> "$trfsconfig" || die ; }
-    else
-        [ "$lvm" == "Yes" ] &&
-            { sed -i 's/hooks="eudev"/hooks="eudev,lvm"/g' "$trfsconfig" || die ; }
-    fi
-
-    if [ "$lvm" == "Yes" ]; then
-        echo 'root=/dev/void/root' >> "$trfsconfig" || die
-    else
-        echo "root=UUID=${partVar}" >> "$trfsconfig" || die
-    fi
-
-    [ "$filesystem" == "btrfs" ] &&
-        { echo 'root_opts="'$btrfsopts',subvol=@"' >> "$trfsconfig" ; }
-
-    [ "$filesystem" != "ext4" ] &&
-        { sed -i "s/root_type=ext4/root_type=${filesystem}/g" "$trfsconfig" || die ; }
-
-    [ "$initrdhostonly" == "true" ] &&
-        { echo 'hostonly=true' >> "$trfsconfig" || die ; }
-
-    unset trfsconfig
 fi
 
 [ "$acpi" == "false" ] &&
@@ -325,9 +136,6 @@ case "$swapStyle" in
     zram)
         commandFailure="Configuring zram has failed."
         echo "zram" >> /mnt/etc/modules-load.d/zram.conf || die
-        echo "zramctl /dev/zram0 --algorithm lz4 --size $swapSize" >> /mnt/etc/rc.local || die
-        echo "mkswap -U clear /dev/zram0" >> /mnt/etc/rc.local || die
-        echo "swapon --discard --priority 100 /dev/zram0" >> /mnt/etc/rc.local || die
     ;;
     swapfile)
         if [ "$filesystem" != "btrfs" ]; then
