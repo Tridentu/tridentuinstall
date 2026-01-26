@@ -112,7 +112,6 @@ case "$bootloader" in
 
     [ "$initrdhostonly" == "true" ] &&
         { echo 'hostonly="yes"' >> /mnt/etc/dracut.conf || die ; }
-fi
 
 [ "$acpi" == "false" ] &&
     { commandFailure="Disabling acpi has failed." ; setKernelParam "acpi=off" ; }
