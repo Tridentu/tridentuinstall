@@ -17,7 +17,7 @@ if [ "$#" == "1" ]; then
         { commandFailure="Sourcing hidden options file has failed." ; die ; }
 fi
 
-# Default to voids base-system unless otherwise defined in the hidden settings file
+# Default to tridentu2's base-system unless otherwise defined in the hidden settings file
 [ -z "$basesystem" ] &&
     basesystem="base-system"
 
@@ -144,9 +144,9 @@ suConfig() {
 
 kernelConfig() {
     if [ "$filesystem" != "zfs" ]; then
-        kernel=$(drawDialog --no-cancel --title "Kernel Choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'linux'" 0 0 0 "linux" "- Normal Void kernel" "linux-lts" "- Older LTS kernel" "linux-mainline" "- Bleeding edge kernel")
+        kernel=$(drawDialog --no-cancel --title "Kernel Choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'linux'" 0 0 0 "linux" "- Normal Tridentu 2 kernel" "linux-lts" "- Older LTS kernel" "linux-mainline" "- Bleeding edge kernel")
     else
-        kernel=$(drawDialog --no-cancel --title "Kernel Choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'linux'" 0 0 0 "linux" "- Normal Void kernel" "linux-lts" "- Older LTS kernel")
+        kernel=$(drawDialog --no-cancel --title "Kernel Choice" --extra-button --extra-label "Map" --menu "If you are unsure, choose 'linux'" 0 0 0 "linux" "- Normal Tridentu 2 kernel" "linux-lts" "- Older LTS kernel")
     fi
     [ "$?" == "3" ] && dungeonmap
 
@@ -187,7 +187,7 @@ userConfig() {
 }
 
 timezoneConfig() {
-    # Most of this timezone section is taken from the normal Void installer.
+    # Most of this timezone section is taken from the normal Tridentu 2 installer.
     local areas=(Africa America Antarctica Arctic Asia Atlantic Australia Europe Indian Pacific)
     if area=$(IFS='|'; drawDialog --no-cancel --title "Set Timezone" --menu "" 0 0 0 $(printf '%s||' "${areas[@]}")) ; then
         read -a locations -d '\n' < <(find /usr/share/zoneinfo/$area -type f -printf '%P\n' | sort) || echo "Disregard exit code"
@@ -204,7 +204,7 @@ localeConfig() {
     [ "$libc" == "musl" ] &&
         repositoryConfig
 
-    # This line is also taken from the normal Void installer.
+    # This line is also taken from the normal Tridentu 2 installer.
     local localeList=$(grep -E '\.UTF-8' /etc/default/libc-locales | awk '{print $1}' | sed -e 's/^#//')
 
     for i in $localeList
@@ -411,7 +411,7 @@ _install() {
 
     clear
 
-    if drawDialog --title "Installation Complete" --yes-label "Reboot" --extra-button --extra-label "Chroot" --no-label "Exit" --yesno "The installation has finished.\n\nIf you would like to make changes before rebooting, you may select 'Chroot' to chroot into the new system.\n\nOtherwise, you may choose 'Reboot' to reboot the system now.\n\nYou may also choose 'Exit' to drop back into the void-live shell.\n\nTotal installer runtime: ${SECONDS} seconds." 0 0 ; then
+    if drawDialog --title "Installation Complete" --yes-label "Reboot" --extra-button --extra-label "Chroot" --no-label "Exit" --yesno "The installation has finished.\n\nIf you would like to make changes before rebooting, you may select 'Chroot' to chroot into the new system.\n\nOtherwise, you may choose 'Reboot' to reboot the system now.\n\nYou may also choose 'Exit' to drop back into the tridentu2-live shell.\n\nTotal installer runtime: ${SECONDS} seconds." 0 0 ; then
         reboot now
     else
         [ "$?" == "3" ] &&
