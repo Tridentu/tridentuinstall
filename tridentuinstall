@@ -380,7 +380,6 @@ _install() {
 
     for i in "${syschrootVarPairs[@]}"
     do
-        set -- $i || die
         echo "$1='$2'" >> /mnt/tmp/installerOptions || die
     done
 
