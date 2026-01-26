@@ -5,7 +5,7 @@ commandFailure="Base system installation has failed."
 installSquashModule "01"
 installSquashModule "02"
 
-system "mkdir -p /mnt/tmp"
+mkdir -p /mnt/tmp
 
 commandFailure="Confuring fstab has failed."
 partVar=$(blkid -o value -s UUID "$esp")

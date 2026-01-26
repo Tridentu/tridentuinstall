@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Source installer library
-. "/tmp/libtridentuis" ||
+. "/libtridentuis" ||
     { echo "/tmp/libtridentuis not found. Cannot continue." ; exit 1 ; }
 
-. "/tmp/installerOptions" ||
+. "/installerOptions" ||
     { commandFailure="Sourcing installer variable file on the new system has failed." ; die ; }
 
 exitFunction () {
@@ -90,3 +90,10 @@ else
     clear
     rootPassword
 fi
+
+
+commandFailure="Setup file cleanup has failed."
+
+rm /chroot
+rm /libtridentuis
+rm /installerOptions

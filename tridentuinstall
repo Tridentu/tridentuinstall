@@ -371,7 +371,7 @@ _install() {
     cp /etc/resolv.conf /mnt/etc/resolv.conf || die
 
     syschrootVarPairs=("bootloader grub" \
-        "su $su" \
+        "su sudo" \
         "timezone $timezone" \
         "encryption $encryption" \
         "diskInput $diskInput" \
@@ -380,12 +380,15 @@ _install() {
 
     for i in "${syschrootVarPairs[@]}"
     do
-        echo "$1='$2'" >> /mnt/tmp/installerOptions || die
+        set -- $i ||  die
+        echo "$1='$2'" >> /tmp/installerOptions || die
     done
 
-    cp -f "$(pwd)"/misc/libtridentuis /mnt/tmp/libtridentuis || die
-    cp -f "$(pwd)"/setup/chroot /mnt/tmp/chroot || die
-    system "/bin/bash /tmp/chroot"
+    cp -f /tmp/installerOptions /mnt/installerOptions || die
+
+    cp -f "$(pwd)"/misc/libtridentuis /mnt/libtridentuis || die
+    cp -f "$(pwd)"/setup/chroot /mnt/chroot || die
+    system "/bin/bash /chroot"
 
     clear
 
@@ -410,7 +413,7 @@ _install() {
 
     clear
 
-    if drawDialog --title "Installation Complete" --yes-label "Reboot" --extra-button --extra-label "Chroot" --no-label "Exit" --yesno "The installation has finished.\n\nIf you would like to make changes before rebooting, you may select 'Chroot' to chroot into the new system.\n\nOtherwise, you may choose 'Reboot' to reboot the system now.\n\nYou may also choose 'Exit' to drop back into the tridentu2-live shell.\n\nTotal installer runtime: ${SECONDS} seconds." 0 0 ; then
+    if drawDialog --title "Installation Complete" --yes-label "Reboot" --extra-button --extra-label "Edit System" --no-label "Exit" --yesno "The installation has finished.\n\nIf you would like to make changes before rebooting, you may select 'Edit System' to chroot into the new system (and edit it).\n\nOtherwise, you may choose 'Reboot' to reboot the system now.\n\nYou may also choose 'Exit' to drop back into the tridentu2-live shell.\n\nTotal installer runtime: ${SECONDS} seconds." 0 0 ; then
         reboot now
     else
         [ "$?" == "3" ] &&
