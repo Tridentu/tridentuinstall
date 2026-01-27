@@ -69,9 +69,6 @@ fi
 [ "$lvm" == "No" ] && [ -n "$homeSize" ] && [ "$encryption" == "No" ] && [ -z "$swap" ] &&
     home="$diskInput""$idvar"3
 
-mkfs.fat -F 32 "$esp" ||
-    { commandFailure="Formatting ESP as vfat has failed." ; die ; }
-
 if [ "$encryption" == "Yes" ]; then
 
     [ -z "$hash" ] &&
@@ -272,6 +269,10 @@ fi
 for dir in dev proc sys run; do mkdir -p /mnt/$dir ; mount --rbind /$dir /mnt/$dir ; mount --make-rslave /mnt/$dir ; done || die
 
 mkdir -p /mnt/boot/efi || die
-mount "$esp" /mnt/boot/efi || die
+
+mkfs.fat -F 32 "$esp" ||
+    { commandFailure="Formatting ESP as vfat has failed." ; die ; }
+
+mount -t vfat "$esp" /mnt/boot/efi || die
 
 return 0
