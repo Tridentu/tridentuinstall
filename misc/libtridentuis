@@ -54,7 +54,7 @@ checkModule() {
 }
 
 installSquashModule() {
-    unsquashfs -d /mnt -exclude-file /etc/tridentu-exclude-list.txt -f /run/initramfs/memory/data/tridentu2-linux/modules/"$1-core.sb" || die
+    unsquashfs -d /mnt -exclude-file /etc/tridentu-exclude-list.txt -f /run/initramfs/live/tridentu2-linux/"$1-core.sb" || die
 }
 
 
