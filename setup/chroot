@@ -50,7 +50,7 @@ chown root:root / || die
 chmod 755 / || die
 
 
-[ "$encryption" == "Yes" ] &&
+if [ "$encryption" == "Yes" ]; then
         commandFailure="Configuring LUKS key has failed."
 
         echo -e "Configuring LUKS key... \n"
@@ -59,6 +59,7 @@ chmod 755 / || die
         cryptsetup luksAddKey "$root" /boot/volume.key || die
         chmod 000 /boot/volume.key || die
         chmod -R g-rwx,o-rwx /boot || die
+fi 
 
 case "$bootloader" in
     grub)
