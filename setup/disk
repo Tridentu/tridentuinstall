@@ -30,7 +30,7 @@ sfdisk --delete "$diskInput"
     echo g; # gpt table
     echo n; echo ; echo ; echo +500M; # ESP
     [ "$lvm" == "No" ] && [ "$swapStyle" == "partition" ] && echo n; echo ; echo ; echo +"$swapSize";
-    if [ "$filesystem" == "zfs" ] || [ "$filesystem" == "btrfs" ] || [ "$lvm" == "Yes" ] || [ "$rootSize" == "full" ]; then
+    if  [ "$filesystem" == "btrfs" ] || [ "$lvm" == "Yes" ] || [ "$rootSize" == "full" ]; then
         echo n; echo ; echo ; echo ;
     fi
     [ "$lvm" == "No" ] && [ "$rootSize" != "full" ] && echo n; echo ; echo ; echo +"$rootSize";
@@ -69,7 +69,7 @@ fi
 [ "$lvm" == "No" ] && [ -n "$homeSize" ] && [ "$encryption" == "No" ] && [ -z "$swap" ] &&
     home="$diskInput""$idvar"3
 
-mkfs.vfat "$esp" ||
+mkfs.fat -F 32 "$esp" ||
     { commandFailure="Formatting ESP as vfat has failed." ; die ; }
 
 if [ "$encryption" == "Yes" ]; then
