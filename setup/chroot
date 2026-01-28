@@ -63,8 +63,10 @@ fi
 
 case "$bootloader" in
     grub)
-        build-grub ||
-            { commandFailure="GRUB installation has failed." ; die ; }
+        commandFailure="GRUB installation has failed."
+        grub-install --target=x86_64-efi $("$diskInput""$idvar")
+        grub-install --bootloader-id="Tridentu 2" --removable
+        build-grub || die 
     ;;
 esac
 
@@ -92,9 +94,14 @@ else
     rootPassword
 fi
 
+commandFailure="Removal of live user has failed."
+
+userdel -r tridentulive || die;
+
+
 
 commandFailure="Setup file cleanup has failed."
 
-rm /chroot
-rm /libtridentuis
-rm /installerOptions
+rm -f /chroot || die
+rm -f /libtridentuis || die
+rm -f /installerOptions || die
