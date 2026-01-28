@@ -388,6 +388,7 @@ _install() {
 
     cp -f "$(pwd)"/misc/libtridentuis /mnt/libtridentuis || die
     cp -f "$(pwd)"/setup/chroot /mnt/chroot || die
+    cp -f "$(pwd)"/misc/grub /mnt/etc/default/grub || die
     system "/bin/bash /chroot"
 
     clear
