@@ -98,7 +98,9 @@ commandFailure="Removal of live user has failed."
 
 userdel -r tridentulive || die;
 
+commandFailure="Crontab has failed to generate."
 
+fcrontab -z -u systab || die
 
 commandFailure="Setup file cleanup has failed."
 
