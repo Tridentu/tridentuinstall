@@ -1,0 +1,10 @@
+#!/bin/bash
+title="HTOP"
+description="- HTOP Process Viewer"
+status=off
+
+main() {
+    commandFailure="Installing Htop failed." &&
+        installCaravelPackage "htop"
+    return 0
+}

@@ -11,7 +11,7 @@ die() {
 }
 
 drawDialog() {
-    dialog --stdout --cancel-label "Skip" --no-mouse --backtitle "https://github.com/Tridentu/tridentinstall" "$@"
+    dialog --stdout --cancel-label "Skip" --no-mouse --backtitle "https://github.com/Tridentu/tridentuinstall" "$@"
 }
 
 diskCalculator() {
@@ -64,6 +64,10 @@ system() {
 
 systemctlEnable() {
     system "systemctl enable $1"
+}
+
+installCaravelPackage() {
+    system "caravel-pm install-package --insecure $1"
 }
 
 
