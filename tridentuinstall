@@ -4,12 +4,12 @@
 # This keeps the installer cleaner and easier to manipulate.
 
 # Source installer library
-. "$(pwd)/misc/libtridentuis" ||
-    { echo "$(pwd)/lib/libtridentuis not found. Cannot continue." ; exit 1 ; }
+. "./misc/libtridentuis" ||
+    { echo "./misc/libtridentuis not found. Cannot continue." ; exit 1 ; }
 
 # Source basic installer setup script
-. "$(pwd)/setup/installer" ||
-    { commandFailure="$(pwd)/setup/installer not found. Cannot continue." ; die ; }
+. "./setup/installer" ||
+    { commandFailure="./setup/installer not found. Cannot continue." ; die ; }
 
 # Source hidden settings file, if there is one.
 if [ "$#" == "1" ]; then
@@ -368,9 +368,7 @@ dungeonmap() {
 }
 
 _install() {
-    . "$(pwd)"/setup/disk
-    . "$(pwd)"/setup/base
-    . "$(pwd)"/setup/desktop
+    ./setup/disk && ./setup/base && ./setup/desktop
 
     commandFailure="System chroot has failed."
     cp /etc/resolv.conf /mnt/etc/resolv.conf || die
