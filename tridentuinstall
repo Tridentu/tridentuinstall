@@ -21,6 +21,11 @@ fi
 [ -z "$basesystem" ] &&
     basesystem="base-system"
 
+dialog --title "Age Verification" --yesno "Are you 18+?" 8 45 ||  { commandFailure="Sorry, kid. Users must be 18+ to use Tridentu 2 1.5 AND above." ; die; }
+
+
+
+
 drawDialog --msgbox "Welcome!\n\nThis is primarily a guided installer, but at any moment you may press the 'Map' button to jump around the installer in a non-linear way, or to go back and change settings.\n\nYou may use your TAB key, arrow keys, and Enter/Return to navigate this TUI.\n\nPressing Enter now will begin the installation process, but no changes will be made to the disk until you confirm your installation settings." 0 0
 
 # Each section of the installer will have its own function, so the user can go back to a specific spot to change something.

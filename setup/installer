@@ -38,10 +38,11 @@ else
     libc="musl"
 fi
 
-echo "Testing for network connectivity..."
-ping -c 1 gnu.org &>/dev/null && ping -c 1 fsf.org &>/dev/null ||
-    { commandFailure="Network check has failed. Please make sure you are connected to the internet." ; die ; }
-
+if [ "$(cat /etc/tridentu_version)" == "CT" ]; then
+    echo "Testing for network connectivity..."
+    ping -c 1 google.com &>/dev/null && ping -c 1 fsf.org &>/dev/null ||
+        { commandFailure="Network check has failed. Please make sure you are connected to the internet." ; die ; }
+fi
 # it doesn't matter if these fail, do not || die
 dialog --create-rc ~/.dialogrc
 # i find the default blue background of dialog to be a little bit irritating, changing colors here.

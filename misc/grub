@@ -2,3 +2,4 @@ GRUB_DEFAULT=tridentu-linux
 GRUB_TIMEOUT=12
 GRUB_DISTRIBUTOR="Tridentu 2"
 GRUB_CMDLINE_LINUX="quiet rw"
+GRUB_THEME="/boot/grub/themes/Elegant-forest-blur-right-dark/theme.txt"
