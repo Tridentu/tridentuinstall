@@ -2,18 +2,18 @@
 
 # This script is an "orchestrator" for the other scripts that exist in the "setup" directory, and is only responsible for setting values and displaying the TUI.
 # This keeps the installer cleaner and easier to manipulate.
-
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Source installer library
-. "./misc/libtridentuis" ||
+source "$SCRIPT_DIR/misc/libtridentuis" ||
     { echo "./misc/libtridentuis not found. Cannot continue." ; exit 1 ; }
 
 # Source basic installer setup script
-. "./setup/installer" ||
+source "$SCRIPT_DIR/setup/installer" ||
     { commandFailure="./setup/installer not found. Cannot continue." ; die ; }
 
 # Source hidden settings file, if there is one.
 if [ "$#" == "1" ]; then
-    . "$1" ||
+    source "$1" ||
         { commandFailure="Sourcing hidden options file has failed." ; die ; }
 fi
 
@@ -368,7 +368,9 @@ dungeonmap() {
 }
 
 _install() {
-    ./setup/disk && ./setup/base && ./setup/desktop
+        source "$SCRIPT_DIR/setup/disk"
+        source "$SCRIPT_DIR/setup/base"
+        source "$SCRIPT_DIR/setup/desktop"
 
     commandFailure="System chroot has failed."
     cp /etc/resolv.conf /mnt/etc/resolv.conf || die
@@ -389,9 +391,9 @@ _install() {
 
     cp -f /tmp/installerOptions /mnt/installerOptions || die
 
-    cp -f "$(pwd)"/misc/libtridentuis /mnt/libtridentuis || die
-    cp -f "$(pwd)"/setup/chroot /mnt/chroot || die
-    cp -f "$(pwd)"/misc/grub /mnt/etc/default/grub || die
+    cp -f "$SCRIPT_DIR/misc/libtridentuis" /mnt/libtridentuis || die
+    cp -f "$SCRIPT_DIR/setup/chroot" /mnt/chroot || die
+    cp -f "$SCRIPT_DIR/misc/grub" /mnt/etc/default/grub || die
     system "/bin/bash /chroot"
 
     clear

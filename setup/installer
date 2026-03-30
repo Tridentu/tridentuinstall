@@ -1,18 +1,18 @@
 #!/bin/bash
 # Basic checks and setup before the installer reaches configuration
-
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 echo "Running basic checks..."
 
 [ "$USER" != root ] &&
     echo -e "${RED}Please execute this script as root.${NC}" && exit 1
 
-dependencies=("$(pwd)/modules" \
-"setup/base" \
-"setup/desktop" \
-"setup/disk" \
-"setup/chroot" \
-"misc/greetd-run" \
-"misc/60-ukify" \
+dependencies=("$SCRIPT_DIR/modules" \
+"$SCRIPT_DIR/setup/base" \
+"$SCRIPT_DIR/setup/desktop" \
+"$SCRIPT_DIR/setup/disk" \
+"$SCRIPT_DIR/setup/chroot" \
+"$SCRIPT_DIR/misc/greetd-run" \
+"$SCRIPT_DIR/misc/60-ukify" \
 )
 
 for i in ${dependencies[@]}; do
